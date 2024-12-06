@@ -61,17 +61,27 @@ class LLMProcessor:
             
     def rerank_results(self, candidates, queries):
         prompt = f"""
-        Based on the following summaries and queries, refine the top candidates:
-
-        Summaries:
+        Analyze multiple candidates based on their resume summaries and the search criteria.
+        
+        Summaries of candidates:
         {candidates}
-
-        Queries:
-        {queries}
-
-        For each candidate provide:
-        - Name
-        - Justification highlighting query matches
+        
+        Search criteria:
+        {', '.join(queries)}
+        
+        For EACH candidate provide:
+        1. Name (extract from summary)
+        2. Match analysis for each search criterion
+        3. Overall fit ranking
+        
+        Format:
+        CANDIDATE: [Name]
+        CRITERIA MATCHES:
+        - [Criterion 1]: [Analysis]
+        - [Criterion 2]: [Analysis]
+        OVERALL: [Ranking and fit assessment]
+        
+        ---
         """
         
         try:
