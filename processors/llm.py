@@ -8,23 +8,53 @@ class LLMProcessor:
     def __init__(self):
         genai.configure(api_key=Config.GEMINI_API_KEY)
         self.model = genai.GenerativeModel(Config.LLM_MODEL)
+
+    def preprocess_resume(self, text):
+        prompt = f"""
+        Condense this resume while preserving all key information about:
+        - Work experience, roles, main accomplishments and the duration the person held each role/project
+        - Companies/Projects names, sectors, main contributions, tools and technics used at each company or project
+        - Skills, tools, technologies, certifications
+        - Education, training
+        - Projects, publications
+        - Dates and total durations
         
+        Input text:
+        {text}
+        """
+        
+        try:
+            response = self.model.generate_content(prompt)
+            return response.text
+        except Exception as e:
+            st.error(f"Error preprocessing resume: {e}")
+            return text
+            
     def chunk_resume(self, text):
         prompt = """
         Segment the provided resume of a candidate into numbered chunks that adhere to the following guidelines:
 
         Chunking Guidelines:
-        -Identify natural breaks in the text, such as topic shifts, paragraph breaks, or sentence ends
-        -Ensure each chunk maintains logical coherence
-        -Avoid redundant content between chunks
-        -Preserve existing formatting
+
+        -Identify natural breaks in the text, such as topic shifts, paragraph breaks, or sentence ends, similar to how a human would.
+        -Ensure each chunk maintains logical coherence with the content before and after it, using full sentences only.
+        -Avoid redundant or overlapping content between chunks, ensuring each contains unique information.
+        -Preserve any existing formatting, such as lists or subheadings, within each chunk to maintain the document's original structure.
+        -Make each role or project realized its own chunk where you see fit so we don't have all of them bunched together in one unique chunk.
+        
+        Avoid Modifications:
+
+        -Do not modify, summarize, or alter the content of the candidate's resume.
+        -If perfectly identical sections of information repeat themselves across the document (e.g., footnotes or headers), output each repeated section only once.
         
         Generate a Summary Chunk:
-        After chunking, create a final summary consolidating:
-        -Core competencies and expertise with years
-        -Achievements and certifications
-        -Professional experience
-        -Educational background
+
+        After chunking the resume, create a final summary chunk that consolidates the key information for a Retrieval-Augmented Generation (RAG) system. This summary should prioritize details such as:
+        -The candidate's core competencies, skills, and expertise with years of experience.
+        -Significant achievements, certifications, or projects.
+        -Relevant professional experience, including roles, industries, and notable contributions.
+        -Educational background and degrees.
+        -Ensure the summary chunk is concise, well-structured, and focuses solely on critical details already present in the chunks.
         
         Output Format:
         candidate_name: <Name>
@@ -32,6 +62,13 @@ class LLMProcessor:
         2 - <Chunk>
         ...
         <Number> - Summary for RAG: <Summary>
+
+        Important Notes:
+
+        -Do not include any introduction, conclusion, notes or explanations about your process in your output. 
+        -Only provide the ordered chunks and the final summary.
+
+        Here's the candidate resume:
         """
         
         try:

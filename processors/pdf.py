@@ -2,12 +2,29 @@
 from PyPDF2 import PdfReader
 import pandas as pd
 import streamlit as st
+import fitz  # PyMuPDF
+import pandas as pd
+import camelot
+import pdfplumber
 
 class PDFProcessor:
+
     def extract_text(self, pdf_file):
         try:
-            reader = PdfReader(pdf_file)
-            return "\n".join(page.extract_text() for page in reader.pages if page.extract_text())
+            with pdfplumber.open(pdf_file) as pdf:
+                text = ""
+                for page in pdf.pages:
+                    # Extract tables
+                    tables = page.extract_tables()
+                    for table in tables:
+                        for row in table:
+                            row = [str(cell) if cell else "" for cell in row]
+                            text += " | ".join(row) + "\n"
+                    
+                    # Extract regular text 
+                    text += (page.extract_text() or "") + "\n"
+
+                return text
         except Exception as e:
             st.error(f"Error reading PDF: {e}")
             return None
@@ -17,7 +34,11 @@ class PDFProcessor:
         if not text:
             return None
             
-        sections = llm_processor.chunk_resume(text)
+        condensed_text = llm_processor.preprocess_resume(text)
+        if not condensed_text:
+            return None
+            
+        sections = llm_processor.chunk_resume(condensed_text)
         if not sections:
             return None
             
