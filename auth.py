@@ -19,6 +19,6 @@ def check_login():
             if submitted and username in CREDENTIALS and CREDENTIALS[username] == password:
                 st.session_state["logged_in"] = True
                 st.success("Login successful!")
-                return True
+                st.rerun()  # Add this line to refresh the page
             return False
     return True

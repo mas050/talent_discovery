@@ -47,6 +47,14 @@ def process_resumes():
             "processed_resumes.csv",
             "text/csv"
         )
+        
+def display_results(results):
+    if results:
+        st.subheader("High Potential Candidates")
+        st.dataframe(results["candidates"])
+        
+        st.subheader("Analysis")
+        st.text_area("LLM Analysis", results["analysis"], height=300)
 
 def query_resumes():
     st.header("Resume Query")
