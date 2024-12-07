@@ -1,25 +1,62 @@
 # AI-Powered Talent Discovery Assistant
 
-A Streamlit application for processing resumes and finding candidates using AI-powered semantic search and LLM reranking.
+An advanced application for processing resumes and finding candidates using AI-powered semantic search, LLM reranking, and usage tracking. Built with Streamlit and Google's Generative AI.
 
 ## Features
 
-- PDF resume processing
-- AI-powered resume chunking
+### Resume Processing
+- PDF text extraction with table support
+- AI-powered text preprocessing and chunking
+- Semantic embeddings generation
+- Intelligent resume summarization
+- Batch processing support
+- Historical data integration
+
+### Resume Query System
+- Multi-query support
 - Semantic search capabilities
 - LLM-based candidate reranking
-- Multi-query support
-- Secure authentication
+- Detailed match analysis
+- Custom similarity scoring
+
+### Admin Dashboard
+- User activity monitoring
+- Usage statistics tracking
+- Cost analysis
+- Token consumption metrics
+- Export capabilities
+- Date-filtered reporting
 
 ## Tech Stack
 
-- Python 3.8+
-- Streamlit
-- Google Generative AI (Gemini)
-- PyPDF2
-- pandas
-- scipy
-- numpy
+- **Frontend**: Streamlit
+- **AI/ML**: 
+  - Google Generative AI (Gemini)
+  - Text embeddings
+  - Semantic search
+- **Data Processing**:
+  - PyMuPDF/PDFPlumber (PDF processing)
+  - pandas
+  - numpy
+  - scipy
+- **Database**: SQLite
+- **Authentication**: Custom user management
+
+## Project Structure
+
+```
+talent_discovery/
+├── main.py           # Main Streamlit application
+├── auth.py           # Authentication system
+├── config.py         # Configuration settings
+├── models.py         # Data models
+├── processors/       # Core processing modules
+│   ├── pdf.py       # PDF handling
+│   └── llm.py       # LLM operations
+└── utils/           # Utility modules
+    ├── search.py    # Semantic search
+    └── database.py  # Usage tracking
+```
 
 ## Setup
 
@@ -37,48 +74,84 @@ source venv/bin/activate  # Mac/Linux
 
 3. Install dependencies:
 ```bash
-pip install streamlit pandas numpy scipy PyPDF2 google-generativeai
+pip install streamlit pandas numpy scipy PyPDF2 google-generativeai pdfplumber
 ```
 
-4. Configure API key:
+4. Configure environment:
 - Rename `config.py.example` to `config.py`
 - Add your Gemini API key
 
 ## Usage
 
-1. Start application:
+### Starting the Application
 ```bash
 streamlit run main.py
 ```
 
-2. Login credentials:
+### User Types
+
+#### Regular User
 - Username: GFT_USER
-- Password: GFT2024!
+- Access to:
+  - Resume processing
+  - Resume querying
 
-3. Features:
-- Upload and process PDFs
-- Add multiple search queries
-- View ranked candidates
-- Export results to CSV
+#### Admin User
+- Username: ADMIN
+- Additional access to:
+  - Usage dashboard
+  - User statistics
+  - Cost tracking
+  - Usage exports
 
-## Project Structure
+### Features Usage
 
+1. **Resume Processing**
+   - Upload single or multiple PDFs
+   - Optional historical data integration
+   - Download processed results
+
+2. **Resume Query**
+   - Multiple search criteria support
+   - View ranked candidates
+   - Detailed match analysis
+
+3. **Admin Dashboard** (Admin only)
+   - View per-user statistics
+   - Monitor token usage
+   - Track costs
+   - Export usage reports
+
+## Data Management
+
+### Usage Tracking
+- Tracks all LLM operations
+- Records token usage
+- Calculates costs
+- Stores user activities
+
+### Database Schema
+```sql
+CREATE TABLE llm_usage (
+    id INTEGER PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    timestamp TEXT NOT NULL,
+    operation_type TEXT NOT NULL,
+    prompt_tokens INTEGER NOT NULL,
+    completion_tokens INTEGER NOT NULL,
+    model TEXT NOT NULL,
+    cost REAL NOT NULL
+)
 ```
-talent_discovery/
-├── main.py           # Main Streamlit app
-├── auth.py           # Authentication
-├── config.py         # Configuration
-├── processors/       # Core processing
-│   ├── pdf.py       # PDF handling
-│   └── llm.py       # LLM operations
-└── utils/           # Utilities
-    └── search.py    # Semantic search
-```
+
+## Contributing
+
+1. Fork the repository
+2. Create feature branch
+3. Commit changes
+4. Push to branch
+5. Open pull request
 
 ## License
 
 MAS050
-
-## Contact
-
-For questions or support, please open an issue on GitHub.
