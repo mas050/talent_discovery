@@ -5,20 +5,143 @@ from processors.pdf import PDFProcessor
 from processors.llm import LLMProcessor
 from utils.search import SemanticSearch
 import pandas as pd
+from utils.database import UsageTracker
+from datetime import datetime, timedelta
 
 def main():
     if not check_login():
         return
 
-    st.title("AI-Powered Talent Discovery Assistant")
-    
     with st.sidebar:
-        app_mode = st.radio("Navigation", ["Resume Processing", "Resume Query"])
+        navigation_options = ["Resume Processing", "Resume Query"]
+        if st.session_state.get("is_admin", False):
+            navigation_options.append("Admin Dashboard")
+        
+        app_mode = st.radio("Navigation", navigation_options)
 
     if app_mode == "Resume Processing":
         process_resumes()
-    else:
+    elif app_mode == "Resume Query":
         query_resumes()
+    elif app_mode == "Admin Dashboard" and st.session_state.get("is_admin", False):
+        show_admin_dashboard()
+    else:
+        st.error("Unauthorized access")
+
+def show_usage_stats():
+    if st.session_state.get("logged_in") and st.session_state.get("user_id"):
+        tracker = UsageTracker()
+        user_id = st.session_state["user_id"]
+        
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("Usage Statistics")
+        total_cost = tracker.get_total_cost(user_id)
+        st.sidebar.metric("Total Cost ($)", f"{total_cost:.4f}")
+        
+        if st.sidebar.button("View Detailed Usage"):
+            st.subheader("Usage Details")
+            usage = tracker.get_user_usage(user_id)
+            if usage:
+                df = pd.DataFrame(usage, columns=[
+                    'id', 'user_id', 'timestamp', 'operation_type',
+                    'prompt_tokens', 'completion_tokens', 'model', 'cost'
+                ])
+                st.dataframe(df)
+            else:
+                st.info("No usage data available")
+
+def show_admin_dashboard():
+    st.title("Admin Dashboard")
+    
+    tracker = UsageTracker()
+    users = tracker.get_all_users()
+    
+    if not users:
+        st.warning("No usage data recorded in the database")
+        total_records = tracker.conn.execute('SELECT COUNT(*) FROM llm_usage').fetchone()[0]
+        st.write(f"Total records in database: {total_records}")
+        return
+        
+    # Add "All Users" option to the list
+    user_options = ["All Users"] + users
+    selected_user = st.selectbox("Select User", user_options)
+    
+    default_start = datetime.now().date() - timedelta(days=30)
+    default_end = datetime.now().date()
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        start_date = st.date_input("From date", default_start)
+    with col2:
+        end_date = st.date_input("To date", default_end)
+
+    # Modify query based on selection
+    if selected_user == "All Users":
+        usage_data = tracker.get_all_usage(start_date, end_date)
+    else:
+        usage_data = tracker.get_user_usage(selected_user, start_date, end_date)
+    
+    if not usage_data:
+        st.info("No usage data found for selected period")
+        return
+
+    df = pd.DataFrame(usage_data, columns=[
+        'id', 'user_id', 'timestamp', 'operation_type', 
+        'prompt_tokens', 'completion_tokens', 'model', 'cost'
+    ])
+    
+    # Summary metrics
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Total Cost", f"${df['cost'].sum():.4f}")
+    with col2:
+        st.metric("Total Operations", len(df))
+    with col3:
+        st.metric("Total Tokens", df['prompt_tokens'].sum() + df['completion_tokens'].sum())
+
+    # Usage breakdown tabs
+     # Usage breakdown tabs
+    tab1, tab2, tab3 = st.tabs(["Operation Summary", "Daily Trend", "Detailed Logs"])
+    
+    with tab1:
+        st.subheader("Usage by Operation Type")
+        op_summary = df.groupby('operation_type').agg({
+            'cost': 'sum',
+            'prompt_tokens': 'sum',
+            'completion_tokens': 'sum'
+        }).reset_index()
+        st.dataframe(op_summary)
+
+    with tab2:
+        st.subheader("Daily Usage Trend")
+        df['date'] = pd.to_datetime(df['timestamp']).dt.date
+        daily_usage = df.groupby('date')['cost'].sum().reset_index()
+        # Replace line_chart with a regular dataframe view
+        st.write("Daily Cost Breakdown:")
+        st.dataframe(
+            daily_usage.sort_values('date', ascending=False),
+            column_config={
+                "date": "Date",
+                "cost": st.column_config.NumberColumn(
+                    "Cost",
+                    format="$%.4f"
+                )
+            }
+        )
+
+    with tab3:
+        st.subheader("Detailed Usage Logs")
+        st.dataframe(df.sort_values('timestamp', ascending=False))
+
+    # Export functionality
+    if st.button("Export Usage Data"):
+        csv = df.to_csv(index=False)
+        st.download_button(
+            "Download CSV",
+            csv,
+            f"usage_report_{selected_user}_{start_date}_{end_date}.csv",
+            "text/csv"
+        )
 
 def process_resumes():
     st.header("Resume Processing")
@@ -47,7 +170,7 @@ def process_resumes():
             "processed_resumes.csv",
             "text/csv"
         )
-        
+
 def display_results(results):
     if results:
         st.subheader("High Potential Candidates")

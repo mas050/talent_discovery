@@ -1,36 +1,87 @@
-# processors/llm.py
+import streamlit as st
 import google.generativeai as genai
+import re
+from datetime import datetime
+from models import Usage
+from utils.database import UsageTracker
 from config import Config
 import json
-import re
 
 class LLMProcessor:
     def __init__(self):
+        self.tracker = UsageTracker()
         genai.configure(api_key=Config.GEMINI_API_KEY)
         self.model = genai.GenerativeModel(Config.LLM_MODEL)
 
-    def preprocess_resume(self, text):
+    def _parse_chunks(self, text):
+        try:
+            # Extract candidate name
+            name_match = re.search(r"candidate_name:\s*(.+)", text)
+            if not name_match:
+                return None
+            
+            # Extract chunks
+            chunks = re.findall(r"\d+\s*-\s*(.+?)(?=\n\d+\s*-|$)", text, re.DOTALL)
+            if not chunks:
+                return None
+                
+            return {
+                "name": name_match.group(1).strip(),
+                "chunks": chunks
+            }
+        except Exception as e:
+            st.error(f"Error parsing chunks: {e}")
+            return None
+        
+    def _log_operation(self, user_id: str, operation_type: str, prompt: str, completion: str, model: str):
+        usage = Usage(
+            user_id=user_id,
+            timestamp=datetime.now(),
+            operation_type=operation_type,
+            prompt_tokens=len(prompt.split()),
+            completion_tokens=len(completion.split()),
+            model=model,
+            cost=0.0  # Will be calculated by UsageTracker
+        )
+        usage.cost = self.tracker.calculate_cost(
+            usage.prompt_tokens,
+            usage.completion_tokens,
+            model
+        )
+        self.tracker.log_usage(usage)
+
+    def preprocess_resume(self, text: str, user_id: str):
         prompt = f"""
         Condense this resume while preserving all key information about:
-        - Work experience, roles, main accomplishments and the duration the person held each role/project
+        - Work experience, roles, list of all the accomplishments and the duration the person held each role/project
         - Companies/Projects names, sectors, main contributions, tools and technics used at each company or project
         - Skills, tools, technologies, certifications
         - Education, training
         - Projects, publications
         - Dates and total durations
         
-        Input text:
+        Maintain the document's original sequence of presentation, so the condense resume has a similar flow and no information is missing.
+
+        Here's the resume to condense:
         {text}
         """
         
         try:
             response = self.model.generate_content(prompt)
-            return response.text
+            result = response.text
+            self._log_operation(
+                user_id=user_id,
+                operation_type='preprocess',
+                prompt=prompt + text,
+                completion=result,
+                model=Config.LLM_MODEL
+            )
+            return result
         except Exception as e:
             st.error(f"Error preprocessing resume: {e}")
             return text
             
-    def chunk_resume(self, text):
+    def chunk_resume(self, text: str, user_id: str):
         prompt = """
         Segment the provided resume of a candidate into numbered chunks that adhere to the following guidelines:
 
@@ -73,16 +124,17 @@ class LLMProcessor:
         
         try:
             response = self.model.generate_content(prompt + text)
-            text = response.text
-            
-            name_match = re.search(r"candidate_name:\s*(.+)", text)
-            if not name_match:
-                return None
-                
-            chunks = re.findall(r"\d+\s*-\s*(.+?)(?=\n\d+\s*-|$)", text, re.DOTALL)
-            return {"name": name_match.group(1).strip(), "chunks": chunks}
+            result = response.text
+            self._log_operation(
+                user_id=user_id,
+                operation_type='chunk',
+                prompt=prompt + text,
+                completion=result,
+                model=Config.LLM_MODEL
+            )
+            return self._parse_chunks(result)
         except Exception as e:
-            st.error(f"LLM error: {e}")
+            st.error(f"Error chunking resume: {e}")
             return None
 
     def get_embedding(self, text):
@@ -91,12 +143,12 @@ class LLMProcessor:
                 model=Config.EMBEDDING_MODEL,
                 content=text
             )
-            return json.dumps(result['embedding'])
+            return json.dumps(result['embedding'])  # Now json is defined
         except Exception as e:
             st.error(f"Embedding error: {e}")
             return None
             
-    def rerank_results(self, candidates, queries):
+    def rerank_results(self, candidates: str, queries: list, user_id: str):
         prompt = f"""
         Analyze multiple candidates based on their resume summaries and the search criteria.
         
@@ -116,6 +168,7 @@ class LLMProcessor:
         CRITERIA MATCHES:
         - [Criterion 1]: [Analysis]
         - [Criterion 2]: [Analysis]
+        - continue to other criteria provided by the user
         OVERALL: [Ranking and fit assessment]
         
         ---
@@ -123,7 +176,15 @@ class LLMProcessor:
         
         try:
             response = self.model.generate_content(prompt)
-            return response.text
+            result = response.text
+            self._log_operation(
+                user_id=user_id,
+                operation_type='rerank',
+                prompt=prompt,
+                completion=result,
+                model=Config.LLM_MODEL
+            )
+            return result
         except Exception as e:
             st.error(f"Reranking error: {e}")
             return None

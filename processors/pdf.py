@@ -30,15 +30,18 @@ class PDFProcessor:
             return None
 
     def process_file(self, pdf_file, llm_processor):
+        user_id = st.session_state.get("user_id")
+        print(f"Current user_id: {user_id}")  # Debug print
+        if not user_id:
+            st.error("User not logged in")
+            return None
+            
         text = self.extract_text(pdf_file)
         if not text:
             return None
             
-        condensed_text = llm_processor.preprocess_resume(text)
-        if not condensed_text:
-            return None
-            
-        sections = llm_processor.chunk_resume(condensed_text)
+        condensed_text = llm_processor.preprocess_resume(text, user_id)
+        sections = llm_processor.chunk_resume(condensed_text, user_id)
         if not sections:
             return None
             

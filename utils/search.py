@@ -4,6 +4,7 @@ from scipy.spatial.distance import cosine
 import json
 import pandas as pd
 from processors.llm import LLMProcessor
+import streamlit as st
 
 class SemanticSearch:
     def __init__(self):
@@ -19,6 +20,8 @@ class SemanticSearch:
             return None
             
     def search_candidates(self, data, queries):
+        user_id = st.session_state.get("user_id")  # Get user_id from session
+        
         data['embedded_chunk'] = data['embedded_chunk'].apply(self.deserialize_embedding)
         top_candidates = pd.DataFrame()
         
@@ -42,7 +45,7 @@ class SemanticSearch:
                 summaries.append(f"Candidate: {name}\n{summary['resume_section_content'].iloc[0]}")
         
         summaries_text = "\n\n---\n\n".join(summaries)
-        refined_results = self.llm_processor.rerank_results(summaries_text, queries)
+        refined_results = self.llm_processor.rerank_results(summaries_text, queries, user_id)  # Add user_id here
         
         return {
             "candidates": unique_candidates,
